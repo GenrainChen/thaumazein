@@ -4,74 +4,106 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Status
 
-**设计阶段，无可执行代码。** 没有 build/test/lint 命令，没有依赖安装步骤。所有当前工作产物为 `docs/` 下的设计文档。创建代码时需遵循 `docs/详细设计/模块设计.md` 中的完整目录结构。
+Hermes 产品线已进入实现阶段（`product/hermes/`），含 FastAPI 后端和 React/Vite 前端。Bastion 和 Terminal 仍为设计阶段。设计文档在 `docs/` 下，是实现的规格依据。
+
+## Development Commands
+
+### Hermes Backend (Python 3.12+)
+
+```bash
+cd product/hermes
+python -m venv .venv && .venv/Scripts/activate   # Windows
+pip install -r requirements.txt
+python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+环境变量：`ZHIPU_API_KEY`（AI 功能）、`HERMES_HOST`/`HERMES_PORT`（默认 127.0.0.1:8000）。SQLite 数据库自动创建在 `data/hermes.db`。
+
+### Hermes Frontend (React 19 + Vite 8 + TypeScript 6)
+
+```bash
+cd product/hermes/frontend
+npm install
+npm run dev        # dev server at localhost:5173
+npm run build      # tsc + vite build
+npm run lint       # eslint
+```
+
+前端通过 `/api` 前缀代理到后端。依赖：Tailwind CSS 4、React Router 7、@xyflow/react（思维导图/流程图）、Zustand。
 
 ## Project Overview
 
 Thaumazein — 三层架构智能感知-操作系统。核心原则是**下载式智能**：Hermes 创造所有智能，Bastion 执行智能产物，Terminal 转换物理信号。
 
-- **Hermes（高层）**— 唯一具备智能创造能力的节点。AI 只存在于 Hermes
-- **Bastion（中间层+高层）**— "包工头"，执行 Hermes 下发的行为包，有执行自主性但无创造自主性。四种物理形态：Ground / Aerial / Submarine / Extreme
-- **Terminal（底层）**— 纯信号转换节点，无智能，仅含传感器和操作器两类产品
-
 通信拓扑：`Hermes ←→ Bastion (Hub) ←→ Terminal (Node)`，双向数据流通。
 
-## Core Architecture
+## Code Architecture
+
+### Hermes Backend (`product/hermes/backend/`)
 
 ```
-product/
-├── hermes/       # 高层：intent/ model/ agent/ dashboard/
-├── bastion/      # 中间层+高层：physics/ codes/(hal, engine, system, bridge)
-└── terminal/     # 底层：sensor/ operator/ common/(power, bootstrap — 无 ai_core)
+backend/
+├── main.py              # FastAPI app, lifespan, CORS, router registration
+├── config.py            # paths, env vars (ZHIPU_API_KEY, model, host/port)
+├── deps.py              # get_db() dependency injection
+├── db/
+│   ├── connection.py    # SQLAlchemy engine + session (SQLite)
+│   └── models.py        # ORM models: Project, Requirement, Goal, MindMap, FlowChart, BehaviorPack, ChatMessage
+├── intent/              # router.py, service.py, schemas.py — 需求录入、AI 解析、目标管理
+├── model/               # router.py, service.py, schemas.py, behavior_pack.py — 思维导图、流程图、行为包构建与签名
+├── agent/               # router.py, service.py, schemas.py, llm_client.py — AI 设计助手聊天（智谱 API）
+└── dashboard/           # router.py, service.py, schemas.py — 项目概览
 ```
 
-### 核心概念
+每个模块遵循 `router → service → db` 分层。API 路径：`/api/{module}`。行为包使用 Ed25519 签名。
 
-**行为包（Behavior Pack）** — Hermes 将验证过的控制律、推理模型、安全规则打包为自包含、版本化的部署单元，部署到 Bastion 本地执行。包含 manifest、models、pipelines、control_laws、safety_rules、schedules、fallback。
+### Hermes Frontend (`product/hermes/frontend/src/`)
 
-**三级控制时序：**
-- 硬实时（100Hz-10kHz）：Bastion 本地执行（电机 PID、传感器采样）
-- 软实时（1Hz-100Hz）：Bastion 本地执行（路径规划、传感器融合）
-- 非实时（<1Hz）：Hermes 在线智能（任务规划、系统重构）
+```
+src/
+├── App.tsx              # BrowserRouter, routes: /, /intent, /model, /agent
+├── main.tsx
+├── api/
+│   ├── client.ts        # 基础 fetch wrapper (get/post/del → /api/*)
+│   ├── intent.ts        # 需求与目标 API
+│   ├── model.ts         # 思维导图与流程图 API
+│   ├── agent.ts         # AI 聊天 API
+│   └── dashboard.ts     # 项目概览 API
+├── intent/              # IntentPage, RequirementCapture
+├── model/               # ModelPage, MindMap (@xyflow/react), FlowChart, BehaviorPackView
+├── agent/               # AgentPage, ChatPanel
+├── dashboard/           # Overview
+└── shared/              # Layout, types
+```
 
-**AI 四阶段：** 设计态（Hermes 创造）→ 部署态（打包下发）→ 执行态（Bastion 确定性执行）→ 反馈态（Bastion 采集经验，Hermes 吸收）
+### Design Docs (`docs/`)
 
-**降级梯次：** Hermes 不可达时，Bastion 按预设梯次响应——链路降级 → 链路丢失 → 长期中断。所有降级程序由 Hermes 编写并打包下发。
+阅读路线：`docs/README.md` → 方法论 → 架构设计 → 详细设计（7 份） → 技术探索。
+
+关键文档：
+- `docs/架构设计.md` — 三层架构骨架、通信接口、执行自主性边界
+- `docs/详细设计/模块设计.md` — 完整目录结构（hermes/bastion/terminal）
+- `docs/详细设计/AI融合架构.md` — AI 四阶段、知识流
+- `docs/详细设计/通信设计.md` — 协议、帧格式、manifest schema
+- `docs/详细设计/功能安全设计.md` — 降级梯次、安全规则、故障分类
+- `docs/详细设计/信息安全架构.md` — 认证、加密、威胁模型
+
+## Core Concepts
+
+**行为包（Behavior Pack）** — Hermes 将验证过的控制律、推理模型、安全规则打包为自包含、版本化的部署单元，部署到 Bastion 本地执行。
+
+**三级控制时序：** 硬实时（100Hz-10kHz, Bastion 本地）→ 软实时（1Hz-100Hz, Bastion 本地）→ 非实时（<1Hz, Hermes 在线）。
+
+**AI 四阶段：** 设计态 → 部署态 → 执行态 → 反馈态。
+
+**降级梯次：** 链路降级 → 链路丢失 → 长期中断。所有降级程序由 Hermes 编写并下发。
 
 ## Hard Constraints
 
-1. **Bastion 不可自创控制策略、修改行为包参数、改变运营目标。** 有执行自主性，但没有创造自主性。
-2. **设计与实现一一对应：** 系统设计中的每一个元素都必须对应到一个物理实体或代码程序。没有悬浮的设计文档，也没有脱离设计的实现代码。四因框架提供检查维度——形式因→代码结构、质料因→硬件/数据、动力因→可执行程序、目的因→验证手段。任何一项无法对应，则设计不可交付。
+1. **Bastion 不可自创控制策略、修改行为包参数、改变运营目标。** 有执行自主性，没有创造自主性。
+2. **设计与实现一一对应：** 系统设计中的每个元素必须对应到物理实体或代码程序。四因框架提供检查维度。
 3. **Terminal 的 common/ 仅含 power/ 和 bootstrap/，禁止添加 ai_core/ 或任何智能模块。**
-4. **所有安全规则由 Hermes 设计并打包下发。** Bastion 的 safety/ 引擎强制执行但不能修改规则。安全规则在架构上独立于控制执行。
-
-## Tech Stack
-
-| 层次 | 推荐方向 |
-|---|---|
-| Hermes 框架 | Electron / Tauri / Web |
-| Hermes AI | Claude API / 本地大模型 |
-| Bastion 引擎 | ONNX Runtime / TensorRT / TFLite |
-| Bastion HAL | C / 汇编 / Rust |
-| Terminal 固件 | C/C++ / Rust |
-| 通信协议 | MQTT / gRPC / 自定义二进制 |
-| 建模语言 | SysML / 自定义 DSL |
-
-## Documentation Structure
-
-阅读路线：`docs/README.md` → 方法论 → 架构设计 → 详细设计（7 份，无严格先后） → 技术探索（参考）。
-
-- `docs/方法论.md` — 四因说认识论重构、AI 语言模块角色定位与思维-实在映射框架
-- `docs/架构设计.md` — 三层架构骨架、产品线定义、通信接口、多节点拓扑、执行自主性边界
-- `docs/详细设计/` — 详细设计文档目录
-  - `模块设计.md` — 三大产品线模块划分、完整目录结构、行为包生命周期
-  - `AI融合架构.md` — AI 四阶段能力边界、知识流细节、Hermes AI 内部架构
-  - `通信设计.md` — 通信协议、帧格式、数据模型（manifest schema、遥测格式、帧格式）
-  - `技术选型.md` — 各项技术选型的依据与适用场景
-  - `功能安全设计.md` — 功能安全（Safety）、降级梯次、安全规则类型、故障分类
-  - `信息安全架构.md` — 信息安全（Security）、认证、加密、威胁模型、固件安全
-  - `星际接口.md` — 预留设计，当前不实现
-- `docs/技术探索/` — 独立研究报告，支撑方法论概念论述，非工程规格
+4. **所有安全规则由 Hermes 设计并打包下发。** Bastion 强制执行但不能修改。
 
 ## Language
 
@@ -79,4 +111,4 @@ product/
 
 ## Design Philosophy
 
-四因说作为认知框架（非本体论）——四因是人类认识世界、改造世界的基本思维模式：形式因（概念抽象，根本）→ 质料因（空间维度分化）→ 动力因（时间维度分化）→ 目的因（人的选择；安全目的是强制底线，其余可选；决定验证路径）。AI 是人类的语言模块，核心能力是翻译（意图→代码）和搜索（设计空间寻优）。Thaumazein 的职能是映射：将四因设计落实到程序（Hermes），再落实到物理实体（Bastion）。设计原则：形式因优先、拥抱抽象化、目的因自觉、简约惊奇、思维到实在的映射。
+四因说作为认知框架（非本体论）——形式因（概念抽象）→ 质料因（空间维度）→ 动力因（时间维度）→ 目的因（人的选择）。AI 是人类的语言模块，核心能力是翻译和搜索。设计原则：形式因优先、拥抱抽象化、目的因自觉、简约惊奇、思维到实在的映射。

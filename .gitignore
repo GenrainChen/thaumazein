@@ -1,1 +1,7 @@
 .claude/
+__pycache__/
+*.pyc
+product/hermes/.venv/
+product/hermes/frontend/node_modules/
+product/hermes/frontend/dist/
+product/hermes/data/

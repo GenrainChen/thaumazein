@@ -1,0 +1,5 @@
+[project]
+name = "hermes"
+version = "0.1.0"
+description = "Thaumazein Hermes — 三层架构智能感知-操作系统的高层节点"
+requires-python = ">=3.12"
