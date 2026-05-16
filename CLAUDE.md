@@ -2,23 +2,27 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Status
+
+**设计阶段，无可执行代码。** 没有 build/test/lint 命令，没有依赖安装步骤。所有当前工作产物为 `docs/` 下的设计文档。创建代码时需遵循 `docs/详细设计/模块设计.md` 中的完整目录结构。
+
 ## Project Overview
 
-Thaumazein — 三层架构智能感知-操作系统，核心原则是"下载式智能"：**Hermes 创造所有智能，Bastion 执行智能产物，Terminal 转换物理信号。** 项目当前处于设计阶段，尚无可执行代码。
+Thaumazein — 三层架构智能感知-操作系统。核心原则是**下载式智能**：Hermes 创造所有智能，Bastion 执行智能产物，Terminal 转换物理信号。
 
 - **Hermes（高层）**— 唯一具备智能创造能力的节点。AI 只存在于 Hermes
-- **Bastion（中间层+高层）**— "包工头"，执行 Hermes 下发的行为包，具备四种物理形态（Ground/Aerial/Submarine/Extreme）
+- **Bastion（中间层+高层）**— "包工头"，执行 Hermes 下发的行为包，有执行自主性但无创造自主性。四种物理形态：Ground / Aerial / Submarine / Extreme
 - **Terminal（底层）**— 纯信号转换节点，无智能，仅含传感器和操作器两类产品
 
 通信拓扑：`Hermes ←→ Bastion (Hub) ←→ Terminal (Node)`，双向数据流通。
 
-## Architecture
+## Core Architecture
 
 ```
 product/
 ├── hermes/       # 高层：intent/ model/ agent/ dashboard/
-├── bastion/      # 中间层+高层：physics/ codes/(hal,engine,system,bridge)
-└── terminal/     # 底层：sensor/ operator/ common/
+├── bastion/      # 中间层+高层：physics/ codes/(hal, engine, system, bridge)
+└── terminal/     # 底层：sensor/ operator/ common/(power, bootstrap — 无 ai_core)
 ```
 
 ### 核心概念
@@ -34,15 +38,12 @@ product/
 
 **降级梯次：** Hermes 不可达时，Bastion 按预设梯次响应——链路降级 → 链路丢失 → 长期中断。所有降级程序由 Hermes 编写并打包下发。
 
-**Bastion 关键约束：** 有执行自主性，但没有创造自主性。不可自创控制策略、修改行为包参数、改变运营目标。
+## Hard Constraints
 
-## Code Creation Rules
-
-创建代码时必须遵循 `docs/详细设计/模块设计.md` 中的目录结构：
-
-- **Hermes** `product/hermes/`：intent/（requirement/、goal/）、model/（architecture/、interface/、simulation/、behavior_design/）、agent/（designer/、generator/、knowledge/、safety_auditor/）、dashboard/（monitor/、analytics/、deployment/）
-- **Bastion** `product/bastion/`：physics/（cad、cae、produce）、codes/hal/（sensor_driver、actuator_driver、comm）、codes/engine/（model_exec、signal_proc、control_exec、behavior_pack、safety）、codes/system/（task、config、update、fallback）、codes/bridge/（sync、protocol、pack_deploy、telemetry）
-- **Terminal** `product/terminal/`：sensor/（firmware、driver、protocol）、operator/（firmware、driver、protocol）、common/（仅 power/ 和 bootstrap/，**无 ai_core/**）
+1. **Bastion 不可自创控制策略、修改行为包参数、改变运营目标。** 有执行自主性，但没有创造自主性。
+2. **设计与实现一一对应：** 系统设计中的每一个元素都必须对应到一个物理实体或代码程序。没有悬浮的设计文档，也没有脱离设计的实现代码。四因框架提供检查维度——形式因→代码结构、质料因→硬件/数据、动力因→可执行程序、目的因→验证手段。任何一项无法对应，则设计不可交付。
+3. **Terminal 的 common/ 仅含 power/ 和 bootstrap/，禁止添加 ai_core/ 或任何智能模块。**
+4. **所有安全规则由 Hermes 设计并打包下发。** Bastion 的 safety/ 引擎强制执行但不能修改规则。安全规则在架构上独立于控制执行。
 
 ## Tech Stack
 
@@ -59,13 +60,14 @@ product/
 ## Documentation Structure
 
 - `docs/方法论.md` — 四因说认识论重构与 MBSE 融合框架
-- `docs/架构设计.md` — 三层架构骨架、产品线定义、通信接口
+- `docs/架构设计.md` — 三层架构骨架、产品线定义、通信接口、多节点拓扑、执行自主性边界
 - `docs/详细设计/` — 详细设计文档目录
-  - `模块设计.md` — 三大产品线模块划分与完整目录结构
-  - `AI融合架构.md` — AI 四阶段模型与知识流
-  - `通信设计.md` — 通信架构细节
-  - `技术选型.md` — 技术选型指引
-  - `故障与安全.md` — 安全原则、降级梯次、节点故障处理
+  - `模块设计.md` — 三大产品线模块划分、完整目录结构、行为包生命周期
+  - `AI融合架构.md` — AI 四阶段能力边界、知识流细节、Hermes AI 内部架构
+  - `通信设计.md` — 通信协议、帧格式、数据模型（manifest schema、遥测格式、帧格式）
+  - `技术选型.md` — 各项技术选型的依据与适用场景
+  - `故障与安全.md` — 功能安全（Safety）、降级梯次、安全规则类型、故障分类
+  - `安全架构.md` — 信息安全（Security）、认证、加密、威胁模型、固件安全
   - `星际接口.md` — 预留设计，当前不实现
 
 ## Language
